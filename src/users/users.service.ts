@@ -1,8 +1,10 @@
 import { Inject, Injectable, Module } from '@nestjs/common'
-import * as schema from '../drizzle/schema'
-import { DrizzleAsyncProvider } from '../drizzle/drizzle.provider'
+import * as schema from '../drizzle/schema.js'
+import { DrizzleAsyncProvider } from '../drizzle/drizzle.provider.js'
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { CreateUserDto } from './dto/userDto'
+import { CreateUserDto } from './dto/userDto.js'
+import { hash } from 'bcrypt'
+import { generateId } from 'lucia'
 
 @Module({
   exports: [UsersService],
@@ -14,19 +16,42 @@ export class UsersService {
   ) {}
 
   getAllUsers() {
-    return this.db.query.users.findMany()
+    return this.db.query.userTable.findMany()
   }
 
   async createUser(createUserDto: CreateUserDto) {
+    const user = await this.db.query.userTable.findFirst({
+      where: (users, { eq }) => eq(users.email, createUserDto.email),
+    })
+
+    if (typeof user !== 'undefined') {
+      throw new Error('User already exists')
+    }
+
     const createdUser = await this.db
-      .insert(schema.users)
+      .insert(schema.userTable)
       .values({
-        id: Math.random().toString(36).substring(7),
+        id: generateId(15),
         ...createUserDto,
+        hashed_password: await hash(createUserDto.password, 10),
       })
       .returning()
       .execute()
 
-    return createdUser
+    const { hashed_password, ...result } = createdUser[0]
+
+    return result
+  }
+
+  async getUserByEmail(email: string) {
+    const user = await this.db.query.userTable.findFirst({
+      where: (users, { eq }) => eq(users.email, email),
+    })
+
+    if (typeof user === 'undefined') {
+      throw new Error('User not found')
+    }
+
+    return user
   }
 }
