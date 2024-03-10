@@ -5,6 +5,7 @@ import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { CreateUserDto } from './dto/userDto.js'
 import { hash } from 'bcrypt'
 import { generateId } from 'lucia'
+import { eq } from 'drizzle-orm'
 
 @Module({
   exports: [UsersService],
@@ -20,11 +21,16 @@ export class UsersService {
   }
 
   async createUser(createUserDto: CreateUserDto) {
-    const user = await this.db.query.userTable.findFirst({
-      where: (users, { eq }) => eq(users.email, createUserDto.email),
-    })
+    const user = await this.db
+      .select({
+        email: schema.userTable.email,
+      })
+      .from(schema.userTable)
+      .where(eq(schema.userTable.email, createUserDto.email))
 
-    if (typeof user !== 'undefined') {
+    console.log('user from db', { user })
+
+    if (user.length === 0) {
       throw new Error('User already exists')
     }
 
@@ -44,14 +50,17 @@ export class UsersService {
   }
 
   async getUserByEmail(email: string) {
-    const user = await this.db.query.userTable.findFirst({
-      where: (users, { eq }) => eq(users.email, email),
-    })
+    const user = await this.db
+      .select()
+      .from(schema.userTable)
+      .where(eq(schema.userTable.email, email))
 
-    if (typeof user === 'undefined') {
+    console.log('user from db', { user })
+
+    if (user.length === 0) {
       throw new Error('User not found')
     }
 
-    return user
+    return user[0]
   }
 }
