@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  Get,
   HttpException,
   HttpStatus,
   Post,
+  Req,
   Res,
+  Logger,
 } from '@nestjs/common'
 import { CreateUserDto } from '../users/dto/userDto.js'
 import { UsersService } from '../users/users.service.js'
@@ -12,7 +15,7 @@ import { LoginDto } from './dto/auth.dto.js'
 import { AuthService } from './auth.service.js'
 import { LuciaService } from './lucia.service.js'
 
-import { Response } from 'express'
+import { Response, Request } from 'express'
 
 @Controller('auth')
 export class AuthController {
@@ -34,11 +37,13 @@ export class AuthController {
       return new Response(null, {
         status: 302,
         headers: {
-          Location: '/',
+          Location: 'localhost:3000/',
           'Set-Cookie': sessionCookie.serialize(),
         },
       })
     } catch (err) {
+      console.error({ error_register: err })
+
       throw new HttpException(
         {
           status: 400,
@@ -55,6 +60,11 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
+    Logger.log(
+      `Login attempt: email: ${dto.email} pass: ${dto.password}`,
+      'AuthController',
+    )
+    // throw new Error('Not implemented')
     try {
       const user = await this.AuthService.login(dto)
 
@@ -62,19 +72,59 @@ export class AuthController {
 
       const sessionCookie = this.LuciaService.createSessionCookie(session.id)
 
+      const { attributes, name, value } = sessionCookie
+
       response.setHeader('Set-Cookie', sessionCookie.serialize())
 
-      response.sendStatus(200)
-      response.end()
-    } catch (err) {
-      throw new HttpException(
-        {
-          status: 400,
-          error: err.message,
+      return {
+        success: true,
+        cookieOptions: {
+          attributes,
+          name,
+          value,
         },
-        HttpStatus.BAD_REQUEST,
-        { cause: err },
-      )
+      }
+
+      // response.end()
+    } catch (err) {
+      console.error(err)
+      return {
+        success: false,
+        message: 'Invalid credentials',
+      }
     }
+  }
+
+  @Get('verify')
+  async verify(@Req() request: Request) {
+    return
+
+    // const session = await this.LuciaService.getSession(request)
+
+    // if (!session) {
+    //   throw new HttpException(
+    //     {
+    //       status: 401,
+    //       error: 'Unauthorized',
+    //     },
+    //     HttpStatus.UNAUTHORIZED,
+    //   )
+    // }
+
+    // return {
+    //   success: true,
+    //   message: 'Authorized',
+    // }
+  }
+
+  @Get('logout')
+  async logout(
+    @Res({ passthrough: true }) response: Response,
+    @Req() request: Request,
+  ) {
+    console.log({
+      c: request.cookies,
+      luciaSetsCookies: this.LuciaService.sessionCookieName,
+    })
   }
 }
