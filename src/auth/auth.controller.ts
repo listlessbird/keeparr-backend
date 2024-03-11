@@ -8,6 +8,7 @@ import {
   Req,
   Res,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { CreateUserDto } from '../users/dto/userDto.js'
 import { UsersService } from '../users/users.service.js'
@@ -24,6 +25,20 @@ export class AuthController {
     private AuthService: AuthService,
     private LuciaService: LuciaService,
   ) {}
+
+  @Get()
+  async auth(@Res({ passthrough: true }) res: Response) {
+    // debugger
+    if (!res.locals.user) {
+      throw new UnauthorizedException()
+    }
+
+    return {
+      success: true,
+      user: res.locals.user,
+      session: res.locals.session,
+    }
+  }
 
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
@@ -90,7 +105,7 @@ export class AuthController {
       console.error(err)
       return {
         success: false,
-        message: 'Invalid credentials',
+        error: 'Invalid credentials',
       }
     }
   }
@@ -122,9 +137,21 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
     @Req() request: Request,
   ) {
-    console.log({
-      c: request.cookies,
-      luciaSetsCookies: this.LuciaService.sessionCookieName,
-    })
+    const session = response.locals.session
+
+    if (!session) {
+      throw new UnauthorizedException()
+    }
+
+    await this.LuciaService.invalidateSession(session.id)
+
+    const sessionCookie = this.LuciaService.createBlankSessionCookie()
+
+    response.setHeader('Set-Cookie', sessionCookie.serialize())
+
+    return {
+      success: true,
+      message: 'Logged out',
+    }
   }
 }
