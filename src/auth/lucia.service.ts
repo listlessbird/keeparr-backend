@@ -24,6 +24,7 @@ export class LuciaService extends Lucia {
       getUserAttributes: (attributes) => {
         return {
           email: attributes.email,
+          username: attributes.username,
         }
       },
     })
