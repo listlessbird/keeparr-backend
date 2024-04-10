@@ -1,4 +1,5 @@
-export type Notes = {
+export type Note = {
   id: string
-  content: any[]
+  name: string
+  blocks: { [key: string]: any }[]
 }
