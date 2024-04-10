@@ -8,6 +8,9 @@ export const drizzleProvider = [
   {
     provide: DrizzleAsyncProvider,
     useFactory: async () => {
+      console.log({
+        DATABASE_URL: process.env.DATABASE_URL,
+      })
       const instance = postgres(process.env.DATABASE_URL)
       const db = drizzle(instance, { schema })
       return db
