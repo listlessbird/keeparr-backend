@@ -2,20 +2,31 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Note } from 'src/types.js'
 import { NotesBucketProvider } from './notes-bucket.provider.js'
 import {S3Root} from "../s3/s3.service.js"
-import { FileHandle, writeFile , open} from 'fs/promises'
+import { FileHandle} from 'fs/promises'
 import path from 'path'
 import fs from 'fs'
 
+import * as schema from '../drizzle/schema.js'
+import {v4 as uuidv4} from 'uuid'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { DrizzleAsyncProvider } from '../drizzle/drizzle.provider.js'
+import { User } from 'lucia'
+
 @Injectable()
 export class NotesService {
-  constructor(private readonly S3Service: S3Root) {}
+  constructor(private readonly S3Service: S3Root,
+  @Inject(DrizzleAsyncProvider) private db: PostgresJsDatabase<typeof schema>,
+  ) {}
   // { "fileId": File}
   public notes = new Map<string, Note>()
 
   //   REmove this latewr
   private gcCache = new Map()
 
-  async createNote({ name, id, blocks }: Note) {
+  async createNote({ name, blocks, user }: Omit<Note, 'id'> & { user: User}) {
+
+    const id = uuidv4();
+
     const fileName = `${name}-${id}.json`;
     const notesDir = './tmp/notes/'
     const filePath = path.join(notesDir, fileName);
@@ -36,7 +47,9 @@ export class NotesService {
         bucket: 'notes',
         key: fileName,
         item: await file.readFile(),
-      });
+      }).then(async () => {
+        await this.addNoteToDb({ id, name, blocks }, user)
+      })
     } catch (error) {
       Logger.error(error);
       throw new Error('Failed to create note');
@@ -307,5 +320,22 @@ export class NotesService {
     }
 
     return null
+  }
+
+
+  private async addNoteToDb(note: Note, user: User) {
+      try {
+       await this.db.insert(schema.notesTable).values({
+        id: note.id,
+        userId: user.id,
+        title: note.name,
+        s3_key: `${note.name}-${note.id}.json`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      } catch (error) {
+        Logger.error(error)
+        throw new Error('Failed to add note to db')
+      }
   }
 }
