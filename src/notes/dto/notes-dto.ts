@@ -3,7 +3,6 @@ import { z } from 'zod'
 export const createNotesSchema = z
   .object({
     name: z.string(),
-    id: z.string(),
     blocks: z.array(z.record(z.any())),
   })
   .required()
