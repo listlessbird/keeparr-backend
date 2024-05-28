@@ -9,6 +9,7 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "dev": "docker-compose up -d && bun run start:debug",
     "db:introspect": "drizzle-kit introspect:pg",
     "db:migrate": "drizzle-kit generate:pg",
     "db:push": "drizzle-kit push:pg",
