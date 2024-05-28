@@ -1,12 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Note } from 'src/types.js'
 import { NotesBucketProvider } from './notes-bucket.provider.js'
-
-import { FileHandle, open } from 'fs/promises'
+import {S3Root} from "../s3/s3.service.js"
+import { FileHandle, writeFile , open} from 'fs/promises'
+import path from 'path'
+import fs from 'fs'
 
 @Injectable()
 export class NotesService {
-  constructor() {}
+  constructor(private readonly S3Service: S3Root) {}
   // { "fileId": File}
   public notes = new Map<string, Note>()
 
@@ -14,19 +16,37 @@ export class NotesService {
   private gcCache = new Map()
 
   async createNote({ name, id, blocks }: Note) {
-    const fileName = `${name}-${id}.json`
-    let file: FileHandle = null
+    const fileName = `${name}-${id}.json`;
+    const notesDir = './tmp/notes/'
+    const filePath = path.join(notesDir, fileName);
+
+    let file: FileHandle = null;
 
     try {
-      file = await open(`/tmp/notes/${fileName}`, 'w+')
-      await file.writeFile(JSON.stringify(blocks, null, 2))
+      if (!fs.existsSync(notesDir)) {
+        fs.mkdirSync(notesDir, { recursive: true });
+      }
+
+      const fileContent = JSON.stringify(blocks, null, 2);
+      await fs.promises.writeFile(filePath, fileContent, { flag: 'w+' });
+
+      file = await fs.promises.open(filePath, 'r');
+
+      await this.S3Service.putItemToBucket({
+        bucket: 'notes',
+        key: fileName,
+        item: await file.readFile(),
+      });
     } catch (error) {
-      Logger.error(error)
-      throw new Error('Failed to create note')
+      Logger.error(error);
+      throw new Error('Failed to create note');
     } finally {
-      if (file) file?.close()
+      if (file) {
+        await file.close();
+      }
     }
   }
+
 
   async getAllNotes() {
     const KEY = '99'
@@ -37,9 +57,7 @@ export class NotesService {
       //   console.log({ gcData })
       return gcData
     }
-    const resp = await fetch(
-      'https://my.api.mockaroo.com/notes_mock_2.json?key=e06d9300',
-    )
+    
     // const json = (await resp.json()) as Notes[]
     const json = [
       {

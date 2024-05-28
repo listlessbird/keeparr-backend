@@ -26,7 +26,7 @@ export class NotesController {
     return this.notesService.getNoteById(params.id)
   }
 
-  @Post(':id')
+  @Post()
   @UsePipes(new ZodValidationPipe(createNotesSchema))
   async createNote(@Body() createNotesDto: CreateNotesDto) {
     Logger.debug('CREATE_NOTE', createNotesDto)

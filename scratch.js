@@ -22,21 +22,8 @@ const s3 = new S3Client({
 
 const bucketName = 'first-bucket'
 
-;(async () => {
-  try {
-    const createBucketResult = await s3.send(
-      new CreateBucketCommand({ Bucket: bucketName }),
-    )
-
-    console.log('CreateBucketResult: ', createBucketResult.Location)
-
-    // an empty object has to be passed otherwise won't work
-    const listBucketsResult = await s3.send(new ListBucketsCommand({}))
-
-    console.log('ListBucketsResult: ', listBucketsResult.Buckets)
-  } catch (err) {
-    console.log('Error', err)
-  }
+;(() => {
+ console.log(__dirname)
 })()
 
 // putObject operation.
