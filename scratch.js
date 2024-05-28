@@ -1,56 +1,44 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  CreateBucketCommand,
-  ListBucketsCommand,
-} from '@aws-sdk/client-s3'
-import dotenv from 'dotenv'
 
-dotenv.config()
 
-const s3 = new S3Client({
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY,
-    secretAccessKey: process.env.S3_SECRET_KEY,
-  },
-  endpoint: 'http://127.0.0.1:9000',
-  s3ForcePathStyle: true, // needed with minio?
-  signatureVersion: 'v4',
-  region: 'us-east-1',
-})
+const dirs = {
+  name: 'dir1',
+  parent: {
+    name: 'dir2',
+    parent: {
+      name: 'dir3',
+      parent: {
+        name: 'dir4',
+        parent: {
+          name: 'dir5',
+          parent: {
+            name: 'dir6',
+            parent: {
+              name: 'dir7',
+              parent: {
+                name: 'dir8',
+                parent: {
+                  name: 'dir9',
+                  parent: {
+                    name: 'dir10',
+                    parent: null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
-const bucketName = 'first-bucket'
+let path = '';
 
-;(() => {
- console.log(__dirname)
-})()
+function getPath(dirs) {
+  if (dirs.parent === null) {
+    return dirs.name;
+  }
+  return getPath(dirs.parent) + '/' + dirs.name;
+}
 
-// putObject operation.
-// const putParams = {
-//   Bucket: 'testbucket',
-//   Key: 'testobject',
-//   Body: 'Hello from Minio!!',
-// }
-
-// s3.send(new PutObjectCommand(putParams))
-//   .then((response) => {
-//     console.log({ response })
-//   })
-//   .catch((error) => {
-//     console.log({ error })
-//   })
-
-// // getObject operation.
-// const getParams = {
-//   Bucket: 'testbucket',
-//   Key: 'testobject',
-// }
-
-// s3.send(new GetObjectCommand(getParams))
-//   .then((response) => {
-//     console.log({ response })
-//   })
-//   .catch((error) => {
-//     console.log({ error })
-//   })
+console.log(getPath(dirs));

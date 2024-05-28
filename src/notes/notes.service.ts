@@ -1,3 +1,4 @@
+import { DirectoryType } from './dto/notes-dto.js';
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Note } from 'src/types.js'
 import { NotesBucketProvider } from './notes-bucket.provider.js'
@@ -24,11 +25,11 @@ export class NotesService {
   //   REmove this latewr
   private gcCache = new Map()
 
-  async createNote({ name, blocks, user }: Omit<Note, 'id'> & { user: User}) {
+  async createNote({ name, blocks, user, directory }: Omit<Note, 'id'> & { user: User}) {
 
     const id = uuidv4();
-
-    const fileName = `${name}-${id}.json`;
+    const s3Path = this.constructDirectoryString(directory)
+    const fileName = `${s3Path}.json`;
     const notesDir = './tmp/notes/'
     const filePath = path.join(notesDir, fileName);
 
@@ -49,7 +50,7 @@ export class NotesService {
         key: fileName,
         item: await file.readFile(),
       }).then(async () => {
-        await this.addNoteToDb({ id, name, blocks }, user)
+        await this.addNoteToDb({note: { id, name, blocks, directory}, user})
       })
     } catch (error) {
       Logger.error(error);
@@ -73,13 +74,20 @@ export class NotesService {
   }
 
 
-  private async addNoteToDb(note: Note, user: User) {
+  private async addNoteToDb({
+    note,
+    user
+  }: {
+    note: Note
+    user: User
+  }) {
       try {
        await this.db.insert(schema.notesTable).values({
         id: note.id,
         userId: user.id,
         title: note.name,
         s3_key: `${note.name}-${note.id}.json`,
+        directory_id: note.directory.id,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -87,5 +95,42 @@ export class NotesService {
         Logger.error(error)
         throw new Error('Failed to add note to db')
       }
+  }
+
+  public async createDirectory({
+    name,
+    user,
+    parentDirectory
+  }: {
+    name: string
+    user: User
+    parentDirectory?: string
+  }) {
+    const id = uuidv4();
+    try {
+      await this.db.insert(schema.notesDirectoryTable).values({
+        id,
+        name,
+        parentdirectoryId: parentDirectory ? parentDirectory : null,
+        userId: user.id,
+      })
+    } catch (error) {
+      Logger.error(error)
+      throw new Error('Failed to create directory')
+    }
+  }
+
+  public constructDirectoryString(directory: DirectoryType) {
+    let directoryString = ''
+
+    const construct = (directory: DirectoryType) => {
+      if (!directory.parentDirectory.name) {
+        return directory.name
+      }
+      return `${construct(directory.parentDirectory)}/${directory.name}`
+    }
+
+    directoryString = construct(directory)
+    return directoryString
   }
 }

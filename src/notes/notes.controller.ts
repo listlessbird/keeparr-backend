@@ -48,7 +48,8 @@ export class NotesController {
     return this.notesService.createNote({
       name: createNotesDto.name,
       blocks: createNotesDto.blocks,
-      user: res.locals.user
+      user: res.locals.user,
+      directory: createNotesDto.directory
     })
   }
 }
