@@ -24,7 +24,7 @@ export const notesTable = pgTable('notes', {
     .notNull()
     .references(() => userTable.id),
   title: text('title'),
-  content: text('content'),
+  s3_key: text('s3_path'),
   createdAt: timestamp('created_at', {
     withTimezone: true,
     mode: 'date',
