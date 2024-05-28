@@ -7,9 +7,9 @@ config({ path: '.env' })
 export default {
   schema: './src/drizzle/schema.ts',
   out: './drizzle',
-  driver: 'pg', // 'pg' | 'mysql2' | 'better-sqlite' | 'libsql' | 'turso'
+  dialect: 'postgresql', // 'pg' | 'mysql2' | 'better-sqlite' | 'libsql' | 'turso'
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL,
     // host: 'postgres',
     // user: 'postgres',
     // password: process.env.POSTGRES_PASSWORD,
