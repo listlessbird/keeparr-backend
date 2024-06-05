@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import {
+  AnyPgColumn,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
+import { InferModel } from 'drizzle-orm'
 
 export const userTable = pgTable('user', {
   id: text('id').primaryKey(),
@@ -24,29 +31,38 @@ export const notesTable = pgTable('notes', {
     .notNull()
     .references(() => userTable.id),
   title: text('title'),
-  directory_id: uuid('directory_id')
-                .references(() => notesDirectoryTable.id),
+  directory_id: uuid('directory_id').references(() => notesDirectoryTable.id),
   s3_key: text('s3_path'),
   createdAt: timestamp('created_at', {
     withTimezone: true,
     mode: 'date',
-  }).notNull().defaultNow(),
+  })
+    .notNull()
+    .defaultNow(),
   updatedAt: timestamp('updated_at', {
     withTimezone: true,
     mode: 'date',
-  }).notNull().defaultNow(),
+  })
+    .notNull()
+    .defaultNow(),
 })
 
 export const notesDirectoryTable = pgTable('notes_directory', {
-  id: uuid('id').primaryKey(),
+  //             ^?
+  id: uuid('id').defaultRandom().primaryKey().notNull(),
   name: text('name'),
-  userId: text('user_id')
-          .notNull()
-          .references(() => userTable.id),
-  parentdirectoryId: uuid('parent_directory_id')
-                          .references(() => notesDirectoryTable.id),
-  createdAt: timestamp('created_at', { withTimezone: true})
-                .notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true})
-                .notNull().defaultNow(),
+  userId: uuid('user_id')
+    .defaultRandom()
+    .notNull()
+    .references(() => userTable.id),
+  parentdirectoryId: text('parent_directory_id').references(
+    // https://github.com/drizzle-team/drizzle-orm/issues/1607
+    (): AnyPgColumn => notesDirectoryTable.id,
+  ),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 })
