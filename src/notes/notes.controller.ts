@@ -70,9 +70,24 @@ export class NotesController {
     // Logger.debug('CREATE_DIRECTORY', createDirectoryDto)
     Logger.debug('CREATE_DIRECTORY', createDirectoryDto)
 
-    return this.notesService.createDirectory({
-      directory: createDirectoryDto.directory,
-      user: res.locals.user,
-    })
+    try {
+      const created = await this.notesService.createDirectory({
+        directory: createDirectoryDto.directory,
+        user: res.locals.user,
+      })
+
+      if (created.id) {
+        return {
+          status: 'success',
+          result: {
+            id: created.id,
+            name: created.name,
+            path: created.path,
+          },
+        }
+      }
+    } catch (error) {
+      throw new Error('Failed to create directory')
+    }
   }
 }

@@ -5,7 +5,6 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { InferModel } from 'drizzle-orm'
 
 export const userTable = pgTable('user', {
   id: text('id').primaryKey(),
@@ -31,7 +30,7 @@ export const notesTable = pgTable('notes', {
     .notNull()
     .references(() => userTable.id),
   title: text('title'),
-  directory_id: uuid('directory_id').references(() => notesDirectoryTable.id),
+  directoryId: uuid('directory_id').references(() => notesDirectoryTable.id),
   s3_key: text('s3_path'),
   createdAt: timestamp('created_at', {
     withTimezone: true,
