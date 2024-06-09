@@ -1,4 +1,4 @@
-import { DirectoryType } from './dto/notes-dto.js'
+import { DirectoryType, UpdateNoteDto } from './dto/notes-dto.js'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Note } from 'src/types.js'
 import { NotesBucketProvider } from './notes-bucket.provider.js'
@@ -47,17 +47,19 @@ export class NotesService {
 
       file = await fs.promises.open(filePath, 'r')
 
-      await this.S3Service.putItemToBucket({
+      const created = await this.S3Service.putItemToBucket({
         bucket: 'notes',
         key: fileName,
         item: await file.readFile(),
       }).then(async () => {
-        await this.addNoteToDb({
+        return await this.addNoteToDb({
           note: { id, name, blocks, directory },
           user,
           s3Key: fileName,
         })
       })
+
+      return created[0]
     } catch (error) {
       Logger.error(error)
       throw new Error('Failed to create note', error)
@@ -76,7 +78,20 @@ export class NotesService {
     return notes
   }
 
-  async getNoteById(id: string): Promise<Note> {
+  private async getNoteMetaById(id: string) {
+    const note = await this.db
+      .select()
+      .from(schema.notesTable)
+      .where(eq(schema.notesTable.id, id))
+
+    if (!note[0]) {
+      throw new Error('Note not found')
+    }
+
+    return { ...note[0], id: note[0].id, name: note[0].title }
+  }
+
+  async getNoteById(id: string) {
     const note = await this.db
       .select()
       .from(schema.notesTable)
@@ -97,6 +112,7 @@ export class NotesService {
       const blockString = await noteContent.Body.transformToString()
       const blocks: Note['blocks'] = JSON.parse(blockString ?? '')
       return {
+        ...note[0],
         id: note[0].id,
         name: note[0].title,
         blocks,
@@ -129,13 +145,16 @@ export class NotesService {
         )
       }
 
-      await this.db.insert(schema.notesTable).values({
-        id: note.id,
-        userId: user.id,
-        title: note.name,
-        s3_key: s3Key,
-        directoryId: directory?.id ? directory.id : null,
-      })
+      return await this.db
+        .insert(schema.notesTable)
+        .values({
+          id: note.id,
+          userId: user.id,
+          title: note.name,
+          s3_key: s3Key,
+          directoryId: directory?.id ? directory.id : null,
+        })
+        .returning()
     } catch (error) {
       Logger.error(error)
       throw new Error('Failed to add note to db')
@@ -225,6 +244,92 @@ export class NotesService {
     } catch (error) {
       Logger.error(error)
       throw new Error('Failed to get directory')
+    }
+  }
+
+  private async updateNoteTitle(noteId: string, name: string) {
+    const updateOp = await this.db
+      .update(schema.notesTable)
+      .set({ title: name })
+      .where(eq(schema.notesTable.id, noteId))
+      .returning()
+
+    return updateOp[0]
+  }
+
+  private async updateNoteBlocks(
+    // TODO: Rethink the type of note with and without Blocks
+    note: Awaited<ReturnType<NotesService['getNoteMetaById']>>,
+    blocks: Note['blocks'],
+    user: User,
+    noteId: string,
+  ) {
+    const s3Path = note.s3_key
+    const fileName = `${s3Path}.json`
+    const notesDir = `./tmp/notes/${user.id}`
+    const filePath = path.join(notesDir, `${noteId}.json`)
+
+    let file: FileHandle = null
+
+    try {
+      if (!fs.existsSync(notesDir)) {
+        fs.mkdirSync(notesDir, { recursive: true })
+      }
+
+      const fileContent = JSON.stringify(blocks, null, 2)
+      await fs.promises.writeFile(filePath, fileContent, { flag: 'w+' })
+
+      file = await fs.promises.open(filePath, 'r')
+
+      const updateOp = await this.S3Service.putItemToBucket({
+        bucket: 'notes',
+        key: fileName,
+        item: await file.readFile(),
+      }).then(async () => {
+        // this might not be needed but still updates the updated_at field
+        return await this.db
+          .update(schema.notesTable)
+          .set({ s3_key: fileName })
+          .where(eq(schema.notesTable.id, noteId))
+          .returning()
+      })
+
+      return updateOp[0]
+    } catch (error) {
+      Logger.error(error)
+      throw new Error('Failed to update note', error)
+    } finally {
+      if (file) {
+        await file.close()
+      }
+    }
+  }
+
+  public async updateNote({
+    name,
+    blocks,
+    user,
+    noteId,
+  }: UpdateNoteDto & { user: User; noteId: string }) {
+    const note = await this.getNoteMetaById(noteId)
+
+    const hasToUpdateName = name && name !== note.name
+
+    if (!hasToUpdateName && !blocks) {
+      return
+    }
+
+    if (hasToUpdateName && !blocks) {
+      return await this.updateNoteTitle(noteId, name)
+    }
+
+    if (!hasToUpdateName && blocks) {
+      return await this.updateNoteBlocks(note, blocks, user, noteId)
+    }
+
+    if (hasToUpdateName && blocks) {
+      await this.updateNoteBlocks(note, blocks, user, noteId)
+      return await this.updateNoteTitle(noteId, name)
     }
   }
 }

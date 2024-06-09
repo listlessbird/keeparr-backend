@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpException,
   HttpStatus,
+  Put,
 } from '@nestjs/common'
 import { NotesService } from './notes.service.js'
 import { ZodValidationPipe } from '../pipes/zod-validation-pipe.js'
@@ -18,6 +19,7 @@ import {
   createDirectorySchema,
   CreateNotesDto,
   createNotesSchema,
+  UpdateNoteDto,
 } from './dto/notes-dto.js'
 import { AuthGuard } from '../auth/auth.guard.js'
 import { Response } from 'express'
@@ -84,13 +86,64 @@ export class NotesController {
         HttpStatus.UNAUTHORIZED,
       )
     }
+    try {
+      const created = await this.notesService.createNote({
+        name: createNotesDto.name,
+        blocks: createNotesDto.blocks,
+        user: res.locals.user,
+        directory: createNotesDto.directory,
+      })
 
-    return this.notesService.createNote({
-      name: createNotesDto.name,
-      blocks: createNotesDto.blocks,
-      user: res.locals.user,
-      directory: createNotesDto.directory,
-    })
+      if (created.id) {
+        return {
+          success: true,
+          data: created,
+        }
+      }
+    } catch (error) {
+      Logger.error(error)
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Failed to create note',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
+  }
+
+  @Put(':id')
+  // @UsePipes(new ZodValidationPipe(updateNoteSchema))
+  async updateNote(
+    @Body() updateNoteDto: UpdateNoteDto,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    Logger.debug('UPDATE_NOTE', id)
+    Logger.debug('UPDATE_NOTE', updateNoteDto)
+    try {
+      const updates = await this.notesService.updateNote({
+        ...updateNoteDto,
+        noteId: id,
+        user: res.locals.user,
+      })
+
+      if (updates.id) {
+        return {
+          success: true,
+          data: updates,
+        }
+      }
+    } catch (error) {
+      Logger.error(error)
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Failed to update note',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
   }
 
   // this is the endpoint that will be called when the user wants to create a new directory
