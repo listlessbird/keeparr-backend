@@ -26,19 +26,30 @@ export class S3Root {
     }
   }
 
-  async putItemToBucket({ bucket, key, item}) {
-
+  async putItemToBucket({ bucket, key, item }) {
     try {
-      const upload = await this.s3.putObject({Bucket: bucket, Key: key, Body: item})
-      
+      const upload = await this.s3.putObject({
+        Bucket: bucket,
+        Key: key,
+        Body: item,
+      })
+
       Logger.debug(`Uploaded ${key} to ${bucket}`, ['S3Root'])
       Logger.debug(`Upload response: ${JSON.stringify(upload.$metadata)}`)
 
-     return upload
-
+      return upload
     } catch (error) {
       throw new Error(`Failed to upload ${key} to ${bucket}: ${error}`)
     }
+  }
 
+  async getItemFromBucket({ bucket, key }) {
+    try {
+      const item = await this.s3.getObject({ Bucket: bucket, Key: key })
+      Logger.debug(`Got ${key} from ${bucket}`, ['S3Root'])
+      return item
+    } catch (error) {
+      throw new Error(`Failed to get ${key} from ${bucket}: ${error}`)
+    }
   }
 }

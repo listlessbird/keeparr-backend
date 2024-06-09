@@ -8,6 +8,8 @@ import {
   UsePipes,
   Res,
   UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common'
 import { NotesService } from './notes.service.js'
 import { ZodValidationPipe } from '../pipes/zod-validation-pipe.js'
@@ -28,16 +30,42 @@ export class NotesController {
   @Get()
   async getAllNotes(@Res({ passthrough: true }) res: Response) {
     if (!res.locals.user) {
-      return res.status(401).send('Unauthorized')
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      )
     }
-    return this.notesService.getNotesByUser(res.locals.user)
+    const notes = await this.notesService.getNotesByUser(res.locals.user)
+
+    return {
+      success: true,
+      data: notes,
+    }
   }
 
-  // @Get(':id')
-  // async getNoteById(@Param() params: any) {
-  //   Logger.debug('GET_NOTE_BY_ID', params.id)
-  //   return this.notesService.getNoteById(params.id)
-  // }
+  @Get(':id')
+  async getNoteById(@Param('id') id: string) {
+    Logger.debug('GET_NOTE_BY_ID', id)
+    const note = await this.notesService.getNoteById(id)
+
+    if (!note.id) {
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Note not found',
+        },
+        HttpStatus.NOT_FOUND,
+      )
+    }
+
+    return {
+      success: true,
+      data: note,
+    }
+  }
 
   @Post()
   @UsePipes(new ZodValidationPipe(createNotesSchema))
@@ -48,7 +76,13 @@ export class NotesController {
     Logger.debug('CREATE_NOTE', createNotesDto)
 
     if (!res.locals.user) {
-      return res.status(401).send('Unauthorized')
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Unauthorized',
+        },
+        HttpStatus.UNAUTHORIZED,
+      )
     }
 
     return this.notesService.createNote({
@@ -78,16 +112,22 @@ export class NotesController {
 
       if (created.id) {
         return {
-          status: 'success',
-          result: {
-            id: created.id,
+          success: true,
+          data: {
+            dirId: created.id,
             name: created.name,
             path: created.path,
           },
         }
       }
     } catch (error) {
-      throw new Error('Failed to create directory')
+      throw new HttpException(
+        {
+          success: false,
+          error: 'Failed to create directory',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      )
     }
   }
 }

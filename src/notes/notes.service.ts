@@ -28,10 +28,12 @@ export class NotesService {
     directory,
   }: Omit<Note, 'id'> & { user: User }) {
     const id = uuidv4()
-    const s3Path = this.constructDirectoryString(directory)
+    const s3Path = directory?.name
+      ? `${user.id}/${this.constructDirectoryString(directory)}`
+      : `${user.id}/${id}`
     const fileName = `${s3Path}.json`
-    const notesDir = './tmp/notes/'
-    const filePath = path.join(notesDir, fileName)
+    const notesDir = `./tmp/notes/${user.id}`
+    const filePath = path.join(notesDir, `${id}.json`)
 
     let file: FileHandle = null
 
@@ -50,11 +52,15 @@ export class NotesService {
         key: fileName,
         item: await file.readFile(),
       }).then(async () => {
-        await this.addNoteToDb({ note: { id, name, blocks, directory }, user })
+        await this.addNoteToDb({
+          note: { id, name, blocks, directory },
+          user,
+          s3Key: fileName,
+        })
       })
     } catch (error) {
       Logger.error(error)
-      throw new Error('Failed to create note')
+      throw new Error('Failed to create note', error)
     } finally {
       if (file) {
         await file.close()
@@ -70,27 +76,65 @@ export class NotesService {
     return notes
   }
 
-  async getNoteById(id: string) {
-    return null
+  async getNoteById(id: string): Promise<Note> {
+    const note = await this.db
+      .select()
+      .from(schema.notesTable)
+      .where(eq(schema.notesTable.id, id))
+
+    if (!note[0]) {
+      throw new Error('Note not found')
+    }
+
+    const s3Key = note[0].s3_key
+
+    const noteContent = await this.S3Service.getItemFromBucket({
+      bucket: 'notes',
+      key: s3Key,
+    })
+
+    try {
+      const blockString = await noteContent.Body.transformToString()
+      const blocks: Note['blocks'] = JSON.parse(blockString ?? '')
+      return {
+        id: note[0].id,
+        name: note[0].title,
+        blocks,
+      }
+    } catch (error) {
+      Logger.error(error)
+      throw new Error('Block parse error')
+    }
   }
 
-  private async addNoteToDb({ note, user }: { note: Note; user: User }) {
+  private async addNoteToDb({
+    note,
+    user,
+    s3Key,
+  }: {
+    note: Note
+    user: User
+    s3Key: string
+  }) {
     try {
-      const directory = await this.getDirectoryByName(
-        note.directory.name,
-      ).catch(async () => {
-        return await this.createDirectory({
-          directory: note.directory,
-          user,
-        })
-      })
+      let directory = null
+      if (note.directory?.name) {
+        directory = await this.getDirectoryByName(note.directory.name).catch(
+          async () => {
+            return await this.createDirectory({
+              directory: note.directory,
+              user,
+            })
+          },
+        )
+      }
 
       await this.db.insert(schema.notesTable).values({
         id: note.id,
         userId: user.id,
         title: note.name,
-        s3_key: `${note.name}-${note.id}.json`,
-        directoryId: directory.id,
+        s3_key: s3Key,
+        directoryId: directory?.id ? directory.id : null,
       })
     } catch (error) {
       Logger.error(error)

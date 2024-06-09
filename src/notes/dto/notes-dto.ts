@@ -16,7 +16,7 @@ const directorySchemaRecursed: z.ZodType<DirectoryType> =
 
 export const createNotesSchema = z.object({
   name: z.string().min(1),
-  directory: directorySchemaRecursed,
+  directory: directorySchemaRecursed.optional(),
   blocks: z.array(z.record(z.any())),
 })
 
