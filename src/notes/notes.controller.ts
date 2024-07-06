@@ -42,9 +42,14 @@ export class NotesController {
     }
     const notes = await this.notesService.getNotesByUser(res.locals.user)
 
+    const transformed = notes.reduce((acc, note) => {
+      acc[note.id] = note
+      return acc
+    }, {})
+
     return {
       success: true,
-      data: notes,
+      data: transformed,
     }
   }
 
