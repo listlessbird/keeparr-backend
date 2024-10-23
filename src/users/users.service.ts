@@ -30,7 +30,7 @@ export class UsersService {
 
     console.log('user from db', { user })
 
-    if (user.length === 0) {
+    if (user.length > 0) {
       throw new Error('User already exists')
     }
 

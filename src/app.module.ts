@@ -9,9 +9,18 @@ import { AuthModule } from './auth/auth.module.js'
 import { LuciaService } from './auth/lucia.service.js'
 import { OriginVerificationMiddleware } from './middlewares/origin.middleware.js'
 import { verifySessionMiddleware } from './middlewares/verifysession.middleware.js'
-
+import { NotesModule } from './notes/notes.module.js'
+import { ConfigModule } from '@nestjs/config'
+import {LoggerModule} from "nestjs-pino"
 @Module({
-  imports: [DrizzleModule, UsersModule, AuthModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot(),
+    DrizzleModule,
+    UsersModule,
+    AuthModule,
+    NotesModule,
+  ],
   controllers: [AppController, UsersController],
   providers: [AppService, UsersService, LuciaService],
 })

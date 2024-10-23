@@ -15,6 +15,19 @@ As a developer, I'd like to see the types for the responses
 - [ ] Write types for the responses
 - [ ] Figure a way to expose the types to the frontend
 
+# Development
+
+## Docker
+
+With a bind mount,
+
+```bash
+ docker run -dp 127.0.0.1:3001:3001 \
+ -w /app --mount type=bind,src="($pwd)",target=/app \
+ keeparr-backend \
+ sh -c "bun install && bun run start:debug"
+```
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
 </p>
